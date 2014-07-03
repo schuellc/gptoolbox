@@ -17,16 +17,21 @@
 %   end
 % end
 
-lastworkspace = '/var/tmp/lastworkspace.mat';
+if ispc
+	lastworkspace = strcat(getenv('USERPROFILE'),'\AppData\Local\Temp\lastworkspace.mat');
+elseif ismac
+	lastworkspace = '/var/tmp/lastworkspace.mat';
+end
 disp(['Saving workspace data to ' lastworkspace]);
 save(lastworkspace);
 
 setpref('StartupDirectory','LastWorkingDirectory',pwd) 
-try 
-    preserve_history; 
-catch EM 
-    h=msgbox(EM.message,sprintf('Error: %s',EM.identifier),'error'); 
-    uiwait(h); 
-    return 
-end
+
+% try 
+%     preserve_history; 
+% catch EM 
+%     h=msgbox(EM.message,sprintf('Error: %s',EM.identifier),'error'); 
+%     uiwait(h); 
+%     return 
+% end
 

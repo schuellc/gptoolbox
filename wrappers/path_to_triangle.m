@@ -8,11 +8,20 @@ function s = path_to_triangle()
   % See also: triangle
 
   if ispc
-    warning([ ...
-      'Dear Ladislav, is there a standard place to put executables on a pc?' ...
-      'Could you put triangle there and change this accordingly?' ...
-      'Thanks, Alec']);
-    s = 'c:/prg/lib/triangle/Release/triangle.exe';
+      
+    % add your path of triangle.exe here
+    paths = {
+       'c:/prg/lib/triangle/Release/triangle.exe';
+       'D:/libraries/triangle/bin/triangle.exe'
+    };
+    
+    for i=1:size(paths,1)
+        if exist(paths{i},'file') == 2
+            s = paths{i};
+            break;
+        end
+    end
+
   elseif ismac
     s = '/opt/local/bin/triangle';
   elseif isunix 

@@ -2,7 +2,12 @@
 %
 % See also: finish
 
-lastworkspace = '/var/tmp/lastworkspace.mat';
+if ispc
+	lastworkspace = strcat(getenv('USERPROFILE'),'\AppData\Local\Temp\lastworkspace.mat');
+elseif ismac
+	lastworkspace = '/var/tmp/lastworkspace.mat';
+end
+
 try
   load(lastworkspace);
 catch

@@ -44,6 +44,7 @@ end
 
 fclose(fid);
 
+found = 1;
 if found == 1                   % add commands in 'append' to end of saved
     [fid, err] = fopen(fullfile(prefdir,'history_saved.m'), 'r'); 
 
