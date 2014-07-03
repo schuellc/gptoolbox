@@ -98,10 +98,10 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
     F = [];
   end
   
-  if isempty(F)
-    if ~isempty(F)
-      warning('Precomputing');
-    end
+  if isempty(F) || ~isfield(F,'precomputed') || F.precomputed == false
+%     if ~isempty(F)
+%       warning('Precomputing');
+%     end
     F = precompute(A,known,Aeq,F);
   end
   [Z,Lambda,Lambda_known] = solve(F,B,Y,Beq);
@@ -153,6 +153,7 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
     % note that columns are in *original* order
     F.Ak = A(F.known,:);
 
+
     % determine if A(unknown,unknown) is symmetric and/or postive definite
     sym_measure = max(max(abs(Auu - Auu')))/max(max(abs(Auu)));
     %sym_measure = normest(Auu-Auu')./normest(Auu);
@@ -163,7 +164,8 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
       % nearly symmetric but not perfectly
       F.Auu_sym = true;
     else
-      assert(sym_measure == 0);
+      % Either Auu is empty or sym_measure should be perfect
+      assert(isempty(sym_measure) || sym_measure == 0);
       % Perfectly symmetric
       F.Auu_sym = true;
     end
@@ -198,7 +200,7 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
     A_sparse = issparse(A);
 
     % Determine number of linearly independent constraints
-    if neq > 0
+    if neq > 0 && ~(isfield(F,'force_Aeq_li') && F.force_Aeq_li)
       %tic;
       % Null space substitution with QR
       [AeqTQ,AeqTR,AeqTE] = qr(Aeq(:,F.unknown)');
@@ -251,6 +253,7 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
         else
           % LDL is faster than LU for moderate #constraints < #unknowns
           NA = A([F.unknown F.lagrange],[F.unknown F.lagrange]);
+          assert(issparse(NA));
           [F.L,F.D,F.P,F.S] = ldl(NA);
           F.ldl = true;
         end
@@ -314,6 +317,7 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
       F.AeqTE = AeqTE;
       F.Auu = Auu;
     end
+    F.precomputed = true;
   end
 
   function [Z,Lambda,Lambda_known] = solve(F,B,Y,Beq)
@@ -347,7 +351,13 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
     end
     assert(kr == size(Y,1), ...
       'Number of knowns (%d) != rows in known values (%d)',kr, size(Y,1));
-    cols = size(Y,2);
+    if isempty(Y)
+      % use linear coefficients to determine cols
+      cols = size(B,2);
+      Y = zeros(0,cols);
+    else
+      cols = size(Y,2);
+    end
 
     if any(F.blank_eq)
       Beq = Beq(~F.blank_eq,:);
@@ -383,10 +393,10 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
       end
 
       % fix any removed constraints (set Lambda to 0)
-      Lambda = zeros(numel(F.blank_eq),1);
+      Lambda = zeros(numel(F.blank_eq),cols);
       if neq ~= 0
         % save lagrange multipliers
-        Lambda(~F.blank_eq) = Z(F.lagrange,:);
+        Lambda(~F.blank_eq,:) = Z(F.lagrange,:);
         % throw away lagrange multipliers
         Z = Z(1:(end-neq),:);
       end
@@ -422,6 +432,6 @@ function [Z,F,Lambda,Lambda_known] = min_quad_with_fixed(A,B,known,Y,Aeq,Beq,F)
     end
 
     Lambda_known = -bsxfun(@plus,F.Ak * Z,0.5*B(F.known,:));
-    
   end
+
 end

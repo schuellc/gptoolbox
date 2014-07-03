@@ -25,6 +25,9 @@ function C = depends(f,depth)
   %  C = depends('myfun');
   %  C = C(cellfun(@isempty,strfind(C,'opt/local/mosek')));
   % 
+  
+  w = warning('off','MATLAB:DEPFUN:DeprecatedAPI');
+  
 
   if(~exist('depth','var'))
     depth = Inf;
@@ -42,11 +45,19 @@ function C = depends(f,depth)
       p = Q{1};
       Q = Q(2:end);
       new_deps = cat(1,new_deps,depfun(p,'-toponly','-quiet'));
+      % This is the non-obsolete version but it's 100x slower : - (
+      %new_deps = cat(1,new_deps, ...
+        %matlab.codetools.requiredFilesAndProducts(p,'toponly')');C
     end
     % ignore anything in matlab folder
     new_deps = new_deps(cellfun(@isempty,strfind(new_deps,matlabroot)));
     Q = setdiff(new_deps,C);
-    C = cat(1,C,Q);
+    if ~isempty(Q)
+      C = cat(1,C,Q);
+    end
     level= level + 1;
   end
+  
+  warning(w);
+  
 end

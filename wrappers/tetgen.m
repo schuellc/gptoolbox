@@ -1,25 +1,44 @@
-function [V,T,F] = tetgen(SV,SF,IV,allow_resampling)
+function [V,T,F] = tetgen(SV,SF,varargin)
   % TETGEN Call tetgen to construct a tetrahedral volume mesh with in a given
   % triangle mesh with optional internal contrained vertices.
   %
-  % [V,T,F] = tetgen(SV,SF,IV)
+  % [V,T,F] = tetgen(SV,SF);
+  % [V,T,F] = tetgen(SV,SF,'ParameterName',ParameterValue, ...)
   %
   % Inputs:
   %   SV  list of surface vertex positions of exterior mesh, # vertices by 3
   %   SF  list of surface face indices of exterior triangle mesh, # faces by 3
-  %   IV  list of internal vertex positions, # internal vertice by 3
-  %   allow_resampling  allow resampling on the surface given [false]
+  %   Optional:
+  %     'Flags'  followed by tetgen flags {'-q100'}
   % Outputs:
   %   V  list of tetrahedra vertices
   %   T  list of tetrahedra indices
   %   F  list of faces of 3D volume mesh
   %
 
-  % determine if internal constraint vertices are present
-  internal_constraints = false;
-  if(exist('IV','var') && prod(size(IV))>0)
-    internal_constraints = true;
-    assert(max(size(setdiff(SV,IV,'rows')) == size(SV)))
+
+  if ~isempty(varargin)
+    assert(ischar(varargin{1}), ...
+      'First optional arg not char. Using obsolete interface?');
+  end
+
+  % default values
+  flags = '-q100';
+  % Map of parameter names to variable names
+  params_to_variables = containers.Map( ...
+    {'Flags'}, {'flags'});
+  v = 1;
+  while v <= numel(varargin)
+    param_name = varargin{v};
+    if isKey(params_to_variables,param_name)
+      assert(v+1<=numel(varargin));
+      v = v+1;
+      % Trick: use feval on anonymous function to use assignin to this workspace 
+      feval(@()assignin('caller',params_to_variables(param_name),varargin{v}));
+    else
+      error('Unsupported parameter: %s',varargin{v});
+    end
+    v=v+1;
   end
 
   % get a temporary file name prefix
@@ -33,22 +52,22 @@ function [V,T,F] = tetgen(SV,SF,IV,allow_resampling)
   poly_filename = [prefix '.poly'];
   writePOLY_tetgen(poly_filename,SV,SF,[],'BoundaryMarkers',ones(size(SF,1),1));
 
-  % if there are internal constraint vertices then print them to a .node file
-  if(internal_constraints)
-    inode_filename = [prefix '.a.node'];
-    writeNODE(inode_filename,IV);
-  end
+  %% if there are internal constraint vertices then print them to a .node file
+  %if(internal_constraints)
+  %  inode_filename = [prefix '.a.node'];
+  %  writeNODE(inode_filename,IV);
+  %end
 
   % graded: -q100, very-fine:-q1
-  flags = '-Cp -q100 ';
-  if(internal_constraints)
-    flags = [flags ' -i'];
-  end
-  if(~exist('allow_resampling','var') || ~allow_resampling)
-    flags = [flags ' -Y' '-V'];
-  end
+  mesh_flags = '-Cpg ';
+  %if(internal_constraints)
+  %  flags = [flags ' -i'];
+  %end
+  %if(~exist('allow_resampling','var') || ~allow_resampling)
+  %  flags = [flags ' -Y' '-V'];
+  %end
   % call tetgen
-  command = [path_to_tetgen ' ' flags ' ' poly_filename];
+  command = [path_to_tetgen ' ' mesh_flags ' ' flags ' ' poly_filename];
   %fprintf(command);
   [status, result] = system(command);
   if status~=0
@@ -62,9 +81,7 @@ function [V,T,F] = tetgen(SV,SF,IV,allow_resampling)
   face_filename = [prefix '.1.face'];
   node_filename = [prefix '.1.node'];
 
-  % Not sure why this isn't coming out 1-indexed
   F = readFACE(face_filename);
-  F = F+1;
   % reverse faces because tetgen uses backwards order
   F = fliplr(F);
   % I guess this is 1-indexed because we're using a .off file rather than a
@@ -72,17 +89,17 @@ function [V,T,F] = tetgen(SV,SF,IV,allow_resampling)
   T = readELE(ele_filename);
   V = readNODE(node_filename);
   if min(T(:)) == 0 && max(T(:))<size(V,1)
+    error
     % make 1-indexed
     T = T + 1;
   else if min(T(:)) >= 1
     %warning('min(T) >= 1, leaving indices as is');
   end
 
-
   delete(poly_filename);
-  if(internal_constraints)
-    delete(inode_filename);
-  end
+  %if(internal_constraints)
+  %  delete(inode_filename);
+  %end
   delete(ele_filename);
   delete(face_filename);
   delete(node_filename);
